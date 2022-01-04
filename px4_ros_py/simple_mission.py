@@ -121,7 +121,7 @@ class SimpleMission(Node):
                 self.takeoff_complete_ = True
                 self.target_altitude_ = cruise_altitude
         else:
-            if dist_to_dest < 1.0:
+            if dist_to_dest < 0.1:
                 self.get_logger().info("Destination Reached")
                 self.destination_reached_ = True
                 msg = Bool()
@@ -146,7 +146,7 @@ class SimpleMission(Node):
         self.lz_x += lza.x
         self.lz_y += lza.y
         self.target_altitude_ += lza.z
-        if np.sqrt(lza.x**2 + lza.y**2) > 1.0 or self.target_altitude_ <= -20:
+        if np.sqrt(lza.x**2 + lza.y**2) > 1.0 or self.target_altitude_ <= -10:
             self.destination_reached_ = False
         else:
             self.get_logger().info("Landing!")
