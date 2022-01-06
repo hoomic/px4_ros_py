@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'simple_mission = px4_ros_py.simple_mission:main'
             , 'obstacle_avoidance = px4_ros_py.obstacle_avoidance:main'
+            , 'height_map = px4_ros_py.height_map:main'
         ],
     },
 )
