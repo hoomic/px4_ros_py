@@ -36,6 +36,11 @@ class SimpleMission(Node):
             , "destination_reached/out"
             , 10
         )
+        self.height_map_init_publisher_ = self.create_publisher(
+            Bool
+            , "height_map/init/in"
+            , 10
+        )
 
         self.vehicle_odometry_subscriber_ = self.create_subscription(
             VehicleOdometry
@@ -61,6 +66,12 @@ class SimpleMission(Node):
             , self.process_landing_zone_adjustment
             , 10
         )
+        self.height_map_metadata_sub_ = self.create_subscription(
+            Float64MultiArray
+            , "height_map/metadata/out"
+            , self.set_height_map_metadata
+            , 10
+        )
         self.timesync_sub_ = self.create_subscription(
             Timesync
             , "fmu/timesync/out"
@@ -80,6 +91,10 @@ class SimpleMission(Node):
         self.lz_y = 0.0
         self.target_yaw_ = 0.0
         self.target_altitude_ = takeoff_altitude
+
+        self.height_map_resolution = 0
+        self.height_map_size = 0
+        self.height_map_initiated = False
 
     def process_timesync(self, msg):
         self.timestamp_ = msg.timestamp
@@ -127,8 +142,12 @@ class SimpleMission(Node):
                 msg = Bool()
                 msg.data = True
                 self.destination_reached_publisher_.publish(msg)
-                #self.auto_land()
                 return
+            if dist_to_dest < self.height_map_size and not self.height_map_initiated:
+                self.height_map_initiated = True
+                init_msg = Bool()
+                init_msg.data = True
+                self.height_map_init_publisher_.publish(init_msg)
             if dist_to_dest < 100:
                 if not self.back_transitioned_:
                     self.get_logger().info("Approaching Destination fly down to landing altitude")
@@ -142,15 +161,19 @@ class SimpleMission(Node):
         self.offboard_setpoint_counter_ += 1
 
     def process_landing_zone_adjustment(self, lza):
-        self.get_logger().info("Process Landing Zone Adjustment dx={0:.2f} dy={1:.2f} dz={2:.2f}".format(lza.x, lza.y, lza.z))
-        self.lz_x += lza.x
-        self.lz_y += lza.y
+        self.get_logger().info("Process Landing Zone Adjustment x={0:.2f} y={1:.2f} dz={2:.2f}".format(lza.x, lza.y, lza.z))
         self.target_altitude_ += lza.z
-        if np.sqrt(lza.x**2 + lza.y**2) > 1.0 or self.target_altitude_ <= -10:
+        if np.sqrt((lza.x - self.lz_x)**2 + (lza.y - self.lz_y)**2) > 1.0 or self.target_altitude_ <= -10:
             self.destination_reached_ = False
         else:
             self.get_logger().info("Landing!")
             self.auto_land()
+        self.lz_x = lza.x
+        self.lz_y = lza.y
+
+    def set_height_map_metadata(self, metadata):
+        self.height_map_resolution = metadata.data[0]
+        self.height_map_size = metadata.data[1]
 
     def process_vehicle_gps_position(self, gps):
         if not self.waypoint_initialized_:
